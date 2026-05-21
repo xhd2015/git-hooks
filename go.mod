@@ -1,0 +1,5 @@
+module git-hooks
+
+go 1.23.0
+
+require github.com/xhd2015/less-gen v0.0.18
