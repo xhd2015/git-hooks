@@ -9,7 +9,7 @@ fi
 
 # git-hooks check
 # see: https://stackoverflow.com/questions/19387073/how-to-detect-commit-amend-by-pre-commit-hook
-is_amend=$(ps -ocommand= -p $PPID | grep -e '--amend')
+is_amend=$(ps -ocommand= -p $PPID | grep -e '--amend' || true)
 # echo "is amend: $is_amend"
 # args is always empty
 # echo "args: ${args[@]}"
