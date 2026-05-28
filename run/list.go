@@ -22,6 +22,7 @@ func listHooks(config Config, phase string, dir string, args []string) error {
 	var showOrigin bool
 	_, err := flags.
 		Bool("--show-origin", &showOrigin).
+		Help("-h,--help", "git-hooks "+phase+" list").
 		Parse(args)
 	if err != nil {
 		return err
