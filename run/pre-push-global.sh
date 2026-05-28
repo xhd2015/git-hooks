@@ -18,5 +18,7 @@ if [ -n "$git_hooks_common_dir" ]; then
 	fi
 fi
 
+# NOTE: "$@" is "origin ssh://git@github.com/xhd2015/git-hooks"
+
 exec git-hooks pre-push run "$@"
 # git-hooks managed global pre-push end

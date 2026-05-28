@@ -204,9 +204,8 @@ func runPreCommitHooks(config Config, args []string) error {
 }
 
 func runPrePushHooks(config Config, args []string) error {
-	if len(args) > 0 {
-		return fmt.Errorf("unrecognized extra args: %s", strings.Join(args, " "))
-	}
+	// NOTE: args might look like
+	// ["origin", "ssh://git@github.com/xhd2015/git-hooks"]
 
 	env := []string{
 		"GIT_HOOK_PHASE=push",
