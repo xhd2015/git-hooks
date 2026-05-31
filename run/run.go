@@ -29,37 +29,53 @@ const help = `
 Usage: git-hooks <command> [OPTIONS]
 
 Commands:
-  install [--global] [--dry-run] install git hook dispatcher
+  install [--global] [--dry-run]   install git hook dispatcher
   pre-commit list [--show-origin]  list managed pre-commit hooks
-  pre-commit add <name> <cmd>   add a managed pre-commit hook
-  pre-commit remove <name>      remove a managed pre-commit hook
-  pre-commit run [--amend]      run managed pre-commit hooks
-  pre-push list [--show-origin]   list managed pre-push hooks
-  pre-push add <name> <cmd>     add a managed pre-push hook
-  pre-push remove <name>        remove a managed pre-push hook
-  pre-push run                  run managed pre-push hooks
+  pre-commit add <name> <cmd>      add a managed pre-commit hook
+  pre-commit remove <name>         remove a managed pre-commit hook
+  pre-commit rename <old> <new>    rename a managed pre-commit hook
+  pre-commit up <name>             move hook earlier (swap with previous)
+  pre-commit down <name>           move hook later (swap with next)
+  pre-commit top <name>            move hook to the first position
+  pre-commit run [--amend]         run managed pre-commit hooks
+  pre-push list [--show-origin]    list managed pre-push hooks
+  pre-push add <name> <cmd>        add a managed pre-push hook
+  pre-push remove <name>           remove a managed pre-push hook
+  pre-push rename <old> <new>      rename a managed pre-push hook
+  pre-push up <name>               move hook earlier (swap with previous)
+  pre-push down <name>             move hook later (swap with next)
+  pre-push top <name>              move hook to the first position
+  pre-push run                     run managed pre-push hooks
 
 Options:
-  -h,--help                     show help message
+  -h,--help                        show help message
 `
 
-const preCommitHelp = `
+	const preCommitHelp = `
 Usage: git-hooks pre-commit <command> [OPTIONS]
 
 Commands:
   list [--show-origin]           list managed pre-commit hooks
   add <name> <cmd>              add a managed pre-commit hook
   remove <name>                 remove a managed pre-commit hook
+  rename <old> <new>            rename a managed pre-commit hook
+  up <name>                     move hook earlier (swap with previous)
+  down <name>                   move hook later (swap with next)
+  top <name>                    move hook to the first position
   run [--amend]                 run managed pre-commit hooks
 `
 
-const prePushHelp = `
+	const prePushHelp = `
 Usage: git-hooks pre-push <command> [OPTIONS]
 
 Commands:
   list [--show-origin]           list managed pre-push hooks
   add <name> <cmd>              add a managed pre-push hook
   remove <name>                 remove a managed pre-push hook
+  rename <old> <new>            rename a managed pre-push hook
+  up <name>                     move hook earlier (swap with previous)
+  down <name>                   move hook later (swap with next)
+  top <name>                    move hook to the first position
   run                           run managed pre-push hooks
 `
 
@@ -140,6 +156,14 @@ func handlePreCommit(config Config, args []string) error {
 		return addPreCommitHook(config, args[1:])
 	case "remove":
 		return removePreCommitHook(config, args[1:])
+	case "rename":
+		return renamePreCommitHook(config, args[1:])
+	case "up":
+		return upPreCommitHook(config, args[1:])
+	case "down":
+		return downPreCommitHook(config, args[1:])
+	case "top":
+		return topPreCommitHook(config, args[1:])
 	case "run":
 		return runPreCommitHooks(config, args[1:])
 	case "help", "--help", "-h":
@@ -168,6 +192,14 @@ func handlePrePush(config Config, args []string) error {
 		return addPrePushHook(config, args[1:])
 	case "remove":
 		return removePrePushHook(config, args[1:])
+	case "rename":
+		return renamePrePushHook(config, args[1:])
+	case "up":
+		return upPrePushHook(config, args[1:])
+	case "down":
+		return downPrePushHook(config, args[1:])
+	case "top":
+		return topPrePushHook(config, args[1:])
 	case "run":
 		return runPrePushHooks(config, args[1:])
 	case "help", "--help", "-h":

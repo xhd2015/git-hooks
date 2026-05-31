@@ -89,6 +89,181 @@ func removePrePushHook(config Config, args []string) error {
 	return nil
 }
 
+func renamePreCommitHook(config Config, args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("usage: git-hooks pre-commit rename <old-name> <new-name>")
+	}
+	return renameHook(managedPreCommitDir(config), args[0], args[1])
+}
+
+func renamePrePushHook(config Config, args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("usage: git-hooks pre-push rename <old-name> <new-name>")
+	}
+	return renameHook(managedPrePushDir(config), args[0], args[1])
+}
+
+func renameHook(dir, oldDisplay, newDisplay string) error {
+	oldFile, err := resolveHookName(dir, oldDisplay)
+	if err != nil {
+		return err
+	}
+	if err := validateHookName(newDisplay); err != nil {
+		return err
+	}
+
+	prefixStr, hasPrefix := hookPrefixStr(oldFile)
+	var newFile string
+	if hasPrefix {
+		newFile = prefixStr + newDisplay
+	} else {
+		newFile = newDisplay
+	}
+
+	newPath := filepath.Join(dir, newFile)
+	if _, err := os.Stat(newPath); err == nil {
+		return fmt.Errorf("hook %s already exists", newDisplay)
+	}
+
+	oldPath := filepath.Join(dir, oldFile)
+	if err := os.Rename(oldPath, newPath); err != nil {
+		return fmt.Errorf("rename failed: %w", err)
+	}
+	fmt.Printf("Renamed %s -> %s\n", oldDisplay, displayHookName(newFile))
+	return nil
+}
+
+func upPreCommitHook(config Config, args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("usage: git-hooks pre-commit up <name>")
+	}
+	return moveHook(managedPreCommitDir(config), args[0], true)
+}
+
+func downPreCommitHook(config Config, args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("usage: git-hooks pre-commit down <name>")
+	}
+	return moveHook(managedPreCommitDir(config), args[0], false)
+}
+
+func topPreCommitHook(config Config, args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("usage: git-hooks pre-commit top <name>")
+	}
+	return topHook(managedPreCommitDir(config), args[0])
+}
+
+func upPrePushHook(config Config, args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("usage: git-hooks pre-push up <name>")
+	}
+	return moveHook(managedPrePushDir(config), args[0], true)
+}
+
+func downPrePushHook(config Config, args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("usage: git-hooks pre-push down <name>")
+	}
+	return moveHook(managedPrePushDir(config), args[0], false)
+}
+
+func topPrePushHook(config Config, args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("usage: git-hooks pre-push top <name>")
+	}
+	return topHook(managedPrePushDir(config), args[0])
+}
+
+func moveHook(dir, displayName string, up bool) error {
+	file, err := resolveHookName(dir, displayName)
+	if err != nil {
+		return err
+	}
+
+	hooks, err := listManagedHooks(dir)
+	if err != nil {
+		return err
+	}
+
+	myIdx := -1
+	for i, h := range hooks {
+		if h == file {
+			myIdx = i
+			break
+		}
+	}
+	if myIdx < 0 {
+		return fmt.Errorf("internal: hook %s not found in sorted list", file)
+	}
+
+	otherIdx := myIdx - 1
+	if !up {
+		otherIdx = myIdx + 1
+	}
+	if otherIdx < 0 || otherIdx >= len(hooks) {
+		if up {
+			return fmt.Errorf("already first")
+		}
+		return fmt.Errorf("already last")
+	}
+
+	otherFile := hooks[otherIdx]
+	if err := swapHookFiles(dir, file, otherFile); err != nil {
+		return err
+	}
+	fmt.Printf("Swapped %s and %s\n", displayHookName(file), displayHookName(otherFile))
+	return nil
+}
+
+func topHook(dir, displayName string) error {
+	file, err := resolveHookName(dir, displayName)
+	if err != nil {
+		return err
+	}
+
+	hooks, err := listManagedHooks(dir)
+	if err != nil {
+		return err
+	}
+	if len(hooks) > 0 && hooks[0] == file {
+		fmt.Printf("%s is already first\n", displayName)
+		return nil
+	}
+
+	topFile := "00-" + displayHookName(file)
+	topPath := filepath.Join(dir, topFile)
+	if _, err := os.Stat(topPath); err == nil {
+		return fmt.Errorf("top position already occupied by %s", displayHookName(topFile))
+	}
+
+	oldPath := filepath.Join(dir, file)
+	if err := os.Rename(oldPath, topPath); err != nil {
+		return fmt.Errorf("rename failed: %w", err)
+	}
+	fmt.Printf("Moved %s to top\n", displayName)
+	return nil
+}
+
+func swapHookFiles(dir, a, b string) error {
+	tmp := "__git_hooks_swap_tmp__"
+	aPath := filepath.Join(dir, a)
+	bPath := filepath.Join(dir, b)
+	tmpPath := filepath.Join(dir, tmp)
+
+	if err := os.Rename(bPath, tmpPath); err != nil {
+		return fmt.Errorf("rename %s failed: %w", b, err)
+	}
+	if err := os.Rename(aPath, bPath); err != nil {
+		os.Rename(tmpPath, bPath)
+		return fmt.Errorf("rename %s failed: %w", a, err)
+	}
+	if err := os.Rename(tmpPath, aPath); err != nil {
+		return fmt.Errorf("rename %s failed: %w", tmp, err)
+	}
+	return nil
+}
+
 func validateHookName(name string) error {
 	if name == "" || name == "." || name == ".." {
 		return fmt.Errorf("invalid hook name: %s", name)
