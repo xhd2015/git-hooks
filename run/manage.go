@@ -5,17 +5,32 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/xhd2015/less-gen/flags"
 )
 
 func addPreCommitHook(config Config, args []string) error {
+	var global bool
+	var err error
+	args, err = flags.Bool("--global", &global).StopOnFirstArg().Parse(args)
+	if err != nil {
+		return err
+	}
 	if len(args) < 2 {
-		return fmt.Errorf("usage: git-hooks pre-commit add <name> <cmd>")
+		return fmt.Errorf("usage: git-hooks pre-commit add [--global] <name> <cmd>")
 	}
 	name := args[0]
 	if err := validateHookName(name); err != nil {
 		return err
 	}
-	dir := managedPreCommitDir(config)
+	useGlobal, managedRoot, err := resolveAddScope(config, global)
+	if err != nil {
+		return err
+	}
+	if err := ensureHooksInstalledForAdd(config, useGlobal); err != nil {
+		return err
+	}
+	dir := filepath.Join(managedRoot, "pre-commit.d")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
@@ -49,14 +64,27 @@ func removePreCommitHook(config Config, args []string) error {
 }
 
 func addPrePushHook(config Config, args []string) error {
+	var global bool
+	var err error
+	args, err = flags.Bool("--global", &global).StopOnFirstArg().Parse(args)
+	if err != nil {
+		return err
+	}
 	if len(args) < 2 {
-		return fmt.Errorf("usage: git-hooks pre-push add <name> <cmd>")
+		return fmt.Errorf("usage: git-hooks pre-push add [--global] <name> <cmd>")
 	}
 	name := args[0]
 	if err := validateHookName(name); err != nil {
 		return err
 	}
-	dir := managedPrePushDir(config)
+	useGlobal, managedRoot, err := resolveAddScope(config, global)
+	if err != nil {
+		return err
+	}
+	if err := ensureHooksInstalledForAdd(config, useGlobal); err != nil {
+		return err
+	}
+	dir := filepath.Join(managedRoot, "pre-push.d")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
@@ -363,4 +391,23 @@ func shellQuote(s string) string {
 		return "''"
 	}
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
+func resolveAddScope(config Config, globalFlag bool) (useGlobal bool, managedRoot string, err error) {
+	inRepo := isInsideGitRepo()
+	if globalFlag || !inRepo {
+		root, err := userConfigRootDir()
+		if err != nil {
+			return false, "", err
+		}
+		return true, root, nil
+	}
+	return false, config.ConfigRoot, nil
+}
+
+func ensureHooksInstalledForAdd(config Config, useGlobal bool) error {
+	if useGlobal {
+		return installGlobalHooks(config, false)
+	}
+	return installLocalHooks(false)
 }

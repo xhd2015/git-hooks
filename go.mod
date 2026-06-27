@@ -1,4 +1,4 @@
-module git-hooks
+module github.com/xhd2015/git-hooks
 
 go 1.23.0
 

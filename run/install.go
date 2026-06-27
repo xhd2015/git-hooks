@@ -43,7 +43,8 @@ func installGlobalHooks(config Config, dryRun bool) error {
 
 	if dryRun {
 		fmt.Println("Dry run: would install global git hooks")
-		fmt.Printf("Config root: %s\n", config.ConfigRoot)
+		userRoot, _ := userConfigRootDir()
+		fmt.Printf("Config root: %s\n", userRoot)
 		fmt.Printf("Would create directory: %s\n", hooksDir)
 		fmt.Printf("Would write executable file: %s\n", preCommitPath)
 		fmt.Printf("Would write executable file: %s\n", prePushPath)

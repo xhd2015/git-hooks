@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"git-hooks/run"
+	"github.com/xhd2015/git-hooks/run"
 )
 
 func main() {

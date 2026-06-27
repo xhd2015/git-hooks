@@ -30,16 +30,16 @@ Usage: git-hooks <command> [OPTIONS]
 
 Commands:
   install [--global] [--dry-run]   install git hook dispatcher
-  pre-commit list [--show-origin]  list managed pre-commit hooks
-  pre-commit add <name> <cmd>      add a managed pre-commit hook
+  pre-commit list [--local] [--global] [--show-origin]  list managed pre-commit hooks
+  pre-commit add [--global] <name> <cmd>  add a managed pre-commit hook (auto-installs dispatchers)
   pre-commit remove <name>         remove a managed pre-commit hook
   pre-commit rename <old> <new>    rename a managed pre-commit hook
   pre-commit up <name>             move hook earlier (swap with previous)
   pre-commit down <name>           move hook later (swap with next)
   pre-commit top <name>            move hook to the first position
   pre-commit run [--amend]         run managed pre-commit hooks
-  pre-push list [--show-origin]    list managed pre-push hooks
-  pre-push add <name> <cmd>        add a managed pre-push hook
+  pre-push list [--local] [--global] [--show-origin]    list managed pre-push hooks
+  pre-push add [--global] <name> <cmd>    add a managed pre-push hook (auto-installs dispatchers)
   pre-push remove <name>           remove a managed pre-push hook
   pre-push rename <old> <new>      rename a managed pre-push hook
   pre-push up <name>               move hook earlier (swap with previous)
@@ -55,8 +55,8 @@ Options:
 Usage: git-hooks pre-commit <command> [OPTIONS]
 
 Commands:
-  list [--show-origin]           list managed pre-commit hooks
-  add <name> <cmd>              add a managed pre-commit hook
+  list [--local] [--global] [--show-origin]  list managed pre-commit hooks
+  add [--global] <name> <cmd>   add a managed pre-commit hook (auto-installs dispatchers)
   remove <name>                 remove a managed pre-commit hook
   rename <old> <new>            rename a managed pre-commit hook
   up <name>                     move hook earlier (swap with previous)
@@ -69,8 +69,8 @@ Commands:
 Usage: git-hooks pre-push <command> [OPTIONS]
 
 Commands:
-  list [--show-origin]           list managed pre-push hooks
-  add <name> <cmd>              add a managed pre-push hook
+  list [--local] [--global] [--show-origin]  list managed pre-push hooks
+  add [--global] <name> <cmd>   add a managed pre-push hook (auto-installs dispatchers)
   remove <name>                 remove a managed pre-push hook
   rename <old> <new>            rename a managed pre-push hook
   up <name>                     move hook earlier (swap with previous)
@@ -274,6 +274,13 @@ func runManagedHooks(config Config, dir string, phase string, extraEnv []string)
 }
 
 func configRootDir() (string, error) {
+	if commonDir, err := gitCommonDirAbs(); err == nil {
+		return filepath.Join(commonDir, "git-hooks"), nil
+	}
+	return userConfigRootDir()
+}
+
+func userConfigRootDir() (string, error) {
 	base := os.Getenv("XDG_CONFIG_HOME")
 	if base == "" {
 		home := os.Getenv("HOME")
@@ -292,7 +299,11 @@ func configRootDir() (string, error) {
 }
 
 func defaultGlobalHooksDir(config Config) string {
-	return filepath.Join(config.ConfigRoot, "hooks")
+	root, err := userConfigRootDir()
+	if err != nil {
+		return filepath.Join(config.ConfigRoot, "hooks")
+	}
+	return filepath.Join(root, "hooks")
 }
 
 func managedPreCommitDir(config Config) string {
@@ -334,10 +345,10 @@ func expandHomePath(path string) string {
 	return filepath.Join(home, strings.TrimPrefix(path, "~/"))
 }
 
-func localHookPath(hookName string) (string, error) {
+func gitCommonDirAbs() (string, error) {
 	commonDir, err := gitOutput("", "rev-parse", "--git-common-dir")
 	if err != nil {
-		return "", fmt.Errorf("not inside a git repo: %w", err)
+		return "", err
 	}
 	commonDir = strings.TrimSpace(commonDir)
 	if commonDir == "" {
@@ -349,6 +360,14 @@ func localHookPath(hookName string) (string, error) {
 			return "", err
 		}
 		commonDir = filepath.Join(wd, commonDir)
+	}
+	return commonDir, nil
+}
+
+func localHookPath(hookName string) (string, error) {
+	commonDir, err := gitCommonDirAbs()
+	if err != nil {
+		return "", fmt.Errorf("not inside a git repo: %w", err)
 	}
 	return filepath.Join(commonDir, "hooks", hookName), nil
 }

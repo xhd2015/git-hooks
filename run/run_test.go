@@ -213,60 +213,64 @@ func TestPreCommitAddRunRemove(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", xdgConfig)
 	t.Setenv("GIT_HOOKS_TEST_OUTPUT", outputFile)
 
-	err := Main([]string{
-		"pre-commit",
-		"add",
-		"write-output",
-		"sh",
-		"-c",
-		`echo ok >> "$GIT_HOOKS_TEST_OUTPUT"`,
+	withNonRepoDir(t, func() {
+		err := Main([]string{
+			"pre-commit",
+			"add",
+			"write-output",
+			"sh",
+			"-c",
+			`echo ok >> "$GIT_HOOKS_TEST_OUTPUT"`,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		hookPath := filepath.Join(xdgConfig, ".git-hooks", "pre-commit.d", "write-output")
+		if _, err := os.Stat(hookPath); err != nil {
+			t.Fatalf("expected hook file: %v", err)
+		}
+
+		if err := Main([]string{"pre-commit", "run"}); err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.TrimSpace(mustRead(t, outputFile)); got != "ok" {
+			t.Fatalf("hook output mismatch: %q", got)
+		}
+
+		if err := Main([]string{"pre-commit", "remove", "write-output"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(hookPath); !os.IsNotExist(err) {
+			t.Fatalf("expected hook to be removed, stat err: %v", err)
+		}
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	hookPath := filepath.Join(xdgConfig, ".git-hooks", "pre-commit.d", "write-output")
-	if _, err := os.Stat(hookPath); err != nil {
-		t.Fatalf("expected hook file: %v", err)
-	}
-
-	if err := Main([]string{"pre-commit", "run"}); err != nil {
-		t.Fatal(err)
-	}
-	if got := strings.TrimSpace(mustRead(t, outputFile)); got != "ok" {
-		t.Fatalf("hook output mismatch: %q", got)
-	}
-
-	if err := Main([]string{"pre-commit", "remove", "write-output"}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(hookPath); !os.IsNotExist(err) {
-		t.Fatalf("expected hook to be removed, stat err: %v", err)
-	}
 }
 
 func TestPreCommitListShowsNamesAndCommands(t *testing.T) {
 	xdgConfig := filepath.Join(t.TempDir(), "config")
 	t.Setenv("XDG_CONFIG_HOME", xdgConfig)
 
-	if err := Main([]string{"pre-commit", "add", "check-keywords", "git-hook-detect-words", "shopee", "seamoney"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := Main([]string{"pre-commit", "add", "author", "git-hook-author-check", "--email", "ends-with:@example.com"}); err != nil {
-		t.Fatal(err)
-	}
-
-	output := captureStdout(t, func() {
-		if err := Main([]string{"pre-commit", "list"}); err != nil {
+	withNonRepoDir(t, func() {
+		if err := Main([]string{"pre-commit", "add", "check-keywords", "git-hook-detect-words", "shopee", "seamoney"}); err != nil {
 			t.Fatal(err)
 		}
+		if err := Main([]string{"pre-commit", "add", "author", "git-hook-author-check", "--email", "ends-with:@example.com"}); err != nil {
+			t.Fatal(err)
+		}
+
+		output := captureStdout(t, func() {
+			if err := Main([]string{"pre-commit", "list"}); err != nil {
+				t.Fatal(err)
+			}
+		})
+		if !strings.Contains(output, "author\tgit-hook-author-check --email ends-with:@example.com\n") {
+			t.Fatalf("missing author hook command:\n%s", output)
+		}
+		if !strings.Contains(output, "check-keywords\tgit-hook-detect-words shopee seamoney\n") {
+			t.Fatalf("missing check-keywords hook command:\n%s", output)
+		}
 	})
-	if !strings.Contains(output, "author\tgit-hook-author-check --email ends-with:@example.com\n") {
-		t.Fatalf("missing author hook command:\n%s", output)
-	}
-	if !strings.Contains(output, "check-keywords\tgit-hook-detect-words shopee seamoney\n") {
-		t.Fatalf("missing check-keywords hook command:\n%s", output)
-	}
 }
 
 func TestPreCommitRunSkipsDuplicateSession(t *testing.T) {
@@ -278,27 +282,29 @@ func TestPreCommitRunSkipsDuplicateSession(t *testing.T) {
 	t.Setenv("GIT_HOOKS_SESSION_ID", "test-session")
 	t.Setenv("TMPDIR", tmp)
 
-	err := Main([]string{
-		"pre-commit",
-		"add",
-		"write-output",
-		"sh",
-		"-c",
-		`echo ok >> "$GIT_HOOKS_TEST_OUTPUT"`,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	withNonRepoDir(t, func() {
+		err := Main([]string{
+			"pre-commit",
+			"add",
+			"write-output",
+			"sh",
+			"-c",
+			`echo ok >> "$GIT_HOOKS_TEST_OUTPUT"`,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if err := Main([]string{"pre-commit", "run"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := Main([]string{"pre-commit", "run"}); err != nil {
-		t.Fatal(err)
-	}
-	if got := strings.TrimSpace(mustRead(t, outputFile)); got != "ok" {
-		t.Fatalf("duplicate session should run hook once, got: %q", got)
-	}
+		if err := Main([]string{"pre-commit", "run"}); err != nil {
+			t.Fatal(err)
+		}
+		if err := Main([]string{"pre-commit", "run"}); err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.TrimSpace(mustRead(t, outputFile)); got != "ok" {
+			t.Fatalf("duplicate session should run hook once, got: %q", got)
+		}
+	})
 }
 
 func mustRead(t *testing.T, path string) string {
@@ -334,6 +340,11 @@ func withDir(t *testing.T, dir string, fn func()) {
 		}
 	}()
 	fn()
+}
+
+func withNonRepoDir(t *testing.T, fn func()) {
+	t.Helper()
+	withDir(t, t.TempDir(), fn)
 }
 
 func captureStdout(t *testing.T, fn func()) string {
@@ -520,211 +531,231 @@ func TestPreCommitRename(t *testing.T) {
 	xdgConfig := filepath.Join(t.TempDir(), "config")
 	t.Setenv("XDG_CONFIG_HOME", xdgConfig)
 
-	Main([]string{"pre-commit", "add", "01-check", "echo", "test"})
+	withNonRepoDir(t, func() {
+		Main([]string{"pre-commit", "add", "01-check", "echo", "test"})
 
-	err := Main([]string{"pre-commit", "rename", "check", "validate"})
-	if err != nil {
-		t.Fatal(err)
-	}
+		err := Main([]string{"pre-commit", "rename", "check", "validate"})
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	dir := filepath.Join(xdgConfig, ".git-hooks", "pre-commit.d")
-	oldPath := filepath.Join(dir, "01-check")
-	newPath := filepath.Join(dir, "01-validate")
+		dir := filepath.Join(xdgConfig, ".git-hooks", "pre-commit.d")
+		oldPath := filepath.Join(dir, "01-check")
+		newPath := filepath.Join(dir, "01-validate")
 
-	if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
-		t.Fatalf("old file should not exist")
-	}
-	if _, err := os.Stat(newPath); err != nil {
-		t.Fatalf("new file should exist: %v", err)
-	}
+		if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
+			t.Fatalf("old file should not exist")
+		}
+		if _, err := os.Stat(newPath); err != nil {
+			t.Fatalf("new file should exist: %v", err)
+		}
+	})
 }
 
 func TestPreCommitRenameNonPrefixed(t *testing.T) {
 	xdgConfig := filepath.Join(t.TempDir(), "config")
 	t.Setenv("XDG_CONFIG_HOME", xdgConfig)
 
-	Main([]string{"pre-commit", "add", "check", "echo", "test"})
+	withNonRepoDir(t, func() {
+		Main([]string{"pre-commit", "add", "check", "echo", "test"})
 
-	err := Main([]string{"pre-commit", "rename", "check", "verify"})
-	if err != nil {
-		t.Fatal(err)
-	}
+		err := Main([]string{"pre-commit", "rename", "check", "verify"})
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	dir := filepath.Join(xdgConfig, ".git-hooks", "pre-commit.d")
-	newPath := filepath.Join(dir, "verify")
-	if _, err := os.Stat(newPath); err != nil {
-		t.Fatalf("renamed file should exist: %v", err)
-	}
+		dir := filepath.Join(xdgConfig, ".git-hooks", "pre-commit.d")
+		newPath := filepath.Join(dir, "verify")
+		if _, err := os.Stat(newPath); err != nil {
+			t.Fatalf("renamed file should exist: %v", err)
+		}
+	})
 }
 
 func TestPreCommitRenameNotFound(t *testing.T) {
 	xdgConfig := filepath.Join(t.TempDir(), "config")
 	t.Setenv("XDG_CONFIG_HOME", xdgConfig)
 
-	err := Main([]string{"pre-commit", "rename", "nonexistent", "newname"})
-	if err == nil {
-		t.Fatal("expected error for nonexistent hook")
-	}
+	withNonRepoDir(t, func() {
+		err := Main([]string{"pre-commit", "rename", "nonexistent", "newname"})
+		if err == nil {
+			t.Fatal("expected error for nonexistent hook")
+		}
+	})
 }
 
 func TestPreCommitUpDown(t *testing.T) {
 	xdgConfig := filepath.Join(t.TempDir(), "config")
 	t.Setenv("XDG_CONFIG_HOME", xdgConfig)
 
-	Main([]string{"pre-commit", "add", "a", "echo", "content-a"})
-	Main([]string{"pre-commit", "add", "b", "echo", "content-b"})
-	Main([]string{"pre-commit", "add", "c", "echo", "content-c"})
+	withNonRepoDir(t, func() {
+		Main([]string{"pre-commit", "add", "a", "echo", "content-a"})
+		Main([]string{"pre-commit", "add", "b", "echo", "content-b"})
+		Main([]string{"pre-commit", "add", "c", "echo", "content-c"})
 
-	dir := filepath.Join(xdgConfig, ".git-hooks", "pre-commit.d")
+		dir := filepath.Join(xdgConfig, ".git-hooks", "pre-commit.d")
 
-	readContent := func(name string) string {
-		t.Helper()
-		data, err := os.ReadFile(filepath.Join(dir, name))
+		readContent := func(name string) string {
+			t.Helper()
+			data, err := os.ReadFile(filepath.Join(dir, name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			return string(data)
+		}
+
+		err := Main([]string{"pre-commit", "up", "b"})
 		if err != nil {
 			t.Fatal(err)
 		}
-		return string(data)
-	}
 
-	err := Main([]string{"pre-commit", "up", "b"})
-	if err != nil {
-		t.Fatal(err)
-	}
+		// up swaps positions: b <-> a
+		if s := readContent("a"); !strings.Contains(s, "content-b") {
+			t.Fatalf("after up b, file a should contain content-b: %s", s)
+		}
+		if s := readContent("b"); !strings.Contains(s, "content-a") {
+			t.Fatalf("after up b, file b should contain content-a: %s", s)
+		}
 
-	// up swaps positions: b <-> a
-	if s := readContent("a"); !strings.Contains(s, "content-b") {
-		t.Fatalf("after up b, file a should contain content-b: %s", s)
-	}
-	if s := readContent("b"); !strings.Contains(s, "content-a") {
-		t.Fatalf("after up b, file b should contain content-a: %s", s)
-	}
+		// b is now at display name "a", so down a moves it back
+		err = Main([]string{"pre-commit", "down", "a"})
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	// b is now at display name "a", so down a moves it back
-	err = Main([]string{"pre-commit", "down", "a"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if s := readContent("a"); !strings.Contains(s, "content-a") {
-		t.Fatalf("after down a, file a should contain content-a again: %s", s)
-	}
-	if s := readContent("b"); !strings.Contains(s, "content-b") {
-		t.Fatalf("after down a, file b should contain content-b again: %s", s)
-	}
+		if s := readContent("a"); !strings.Contains(s, "content-a") {
+			t.Fatalf("after down a, file a should contain content-a again: %s", s)
+		}
+		if s := readContent("b"); !strings.Contains(s, "content-b") {
+			t.Fatalf("after down a, file b should contain content-b again: %s", s)
+		}
+	})
 }
 
 func TestPreCommitUpNonPrefixedWithPrefixed(t *testing.T) {
 	xdgConfig := filepath.Join(t.TempDir(), "config")
 	t.Setenv("XDG_CONFIG_HOME", xdgConfig)
 
-	Main([]string{"pre-commit", "add", "01-first", "echo", "first-content"})
-	Main([]string{"pre-commit", "add", "plain", "echo", "plain-content"})
+	withNonRepoDir(t, func() {
+		Main([]string{"pre-commit", "add", "01-first", "echo", "first-content"})
+		Main([]string{"pre-commit", "add", "plain", "echo", "plain-content"})
 
-	dir := filepath.Join(xdgConfig, ".git-hooks", "pre-commit.d")
+		dir := filepath.Join(xdgConfig, ".git-hooks", "pre-commit.d")
 
-	readContent := func(name string) string {
-		t.Helper()
-		data, err := os.ReadFile(filepath.Join(dir, name))
+		readContent := func(name string) string {
+			t.Helper()
+			data, err := os.ReadFile(filepath.Join(dir, name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			return string(data)
+		}
+
+		err := Main([]string{"pre-commit", "up", "plain"})
 		if err != nil {
 			t.Fatal(err)
 		}
-		return string(data)
-	}
 
-	err := Main([]string{"pre-commit", "up", "plain"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if s := readContent("01-first"); !strings.Contains(s, "plain-content") {
-		t.Fatalf("after up, 01-first should contain plain-content: %s", s)
-	}
-	if s := readContent("plain"); !strings.Contains(s, "first-content") {
-		t.Fatalf("after up, plain should contain first-content: %s", s)
-	}
+		if s := readContent("01-first"); !strings.Contains(s, "plain-content") {
+			t.Fatalf("after up, 01-first should contain plain-content: %s", s)
+		}
+		if s := readContent("plain"); !strings.Contains(s, "first-content") {
+			t.Fatalf("after up, plain should contain first-content: %s", s)
+		}
+	})
 }
 
 func TestPreCommitUpFirstError(t *testing.T) {
 	xdgConfig := filepath.Join(t.TempDir(), "config")
 	t.Setenv("XDG_CONFIG_HOME", xdgConfig)
 
-	Main([]string{"pre-commit", "add", "01-first", "echo", "first"})
-	Main([]string{"pre-commit", "add", "10-second", "echo", "second"})
+	withNonRepoDir(t, func() {
+		Main([]string{"pre-commit", "add", "01-first", "echo", "first"})
+		Main([]string{"pre-commit", "add", "10-second", "echo", "second"})
 
-	err := Main([]string{"pre-commit", "up", "first"})
-	if err == nil {
-		t.Fatal("expected error when moving first hook up")
-	}
+		err := Main([]string{"pre-commit", "up", "first"})
+		if err == nil {
+			t.Fatal("expected error when moving first hook up")
+		}
+	})
 }
 
 func TestPreCommitDownLastError(t *testing.T) {
 	xdgConfig := filepath.Join(t.TempDir(), "config")
 	t.Setenv("XDG_CONFIG_HOME", xdgConfig)
 
-	Main([]string{"pre-commit", "add", "01-first", "echo", "first"})
-	Main([]string{"pre-commit", "add", "10-second", "echo", "second"})
+	withNonRepoDir(t, func() {
+		Main([]string{"pre-commit", "add", "01-first", "echo", "first"})
+		Main([]string{"pre-commit", "add", "10-second", "echo", "second"})
 
-	err := Main([]string{"pre-commit", "down", "second"})
-	if err == nil {
-		t.Fatal("expected error when moving last hook down")
-	}
+		err := Main([]string{"pre-commit", "down", "second"})
+		if err == nil {
+			t.Fatal("expected error when moving last hook down")
+		}
+	})
 }
 
 func TestPreCommitTop(t *testing.T) {
 	xdgConfig := filepath.Join(t.TempDir(), "config")
 	t.Setenv("XDG_CONFIG_HOME", xdgConfig)
 
-	Main([]string{"pre-commit", "add", "01-first", "echo", "first"})
-	Main([]string{"pre-commit", "add", "10-second", "echo", "second"})
-	Main([]string{"pre-commit", "add", "plain", "echo", "plain"})
+	withNonRepoDir(t, func() {
+		Main([]string{"pre-commit", "add", "01-first", "echo", "first"})
+		Main([]string{"pre-commit", "add", "10-second", "echo", "second"})
+		Main([]string{"pre-commit", "add", "plain", "echo", "plain"})
 
-	dir := filepath.Join(xdgConfig, ".git-hooks", "pre-commit.d")
+		dir := filepath.Join(xdgConfig, ".git-hooks", "pre-commit.d")
 
-	err := Main([]string{"pre-commit", "top", "plain"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	hooks, _ := listManagedHooks(dir)
-	expected := []string{"00-plain", "01-first", "10-second"}
-	for i, w := range expected {
-		if i >= len(hooks) || hooks[i] != w {
-			t.Fatalf("position %d: got %v, want %v (full: %v)", i, hooks, w, hooks)
+		err := Main([]string{"pre-commit", "top", "plain"})
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
+
+		hooks, _ := listManagedHooks(dir)
+		expected := []string{"00-plain", "01-first", "10-second"}
+		for i, w := range expected {
+			if i >= len(hooks) || hooks[i] != w {
+				t.Fatalf("position %d: got %v, want %v (full: %v)", i, hooks, w, hooks)
+			}
+		}
+	})
 }
 
 func TestPreCommitTopAlreadyFirst(t *testing.T) {
 	xdgConfig := filepath.Join(t.TempDir(), "config")
 	t.Setenv("XDG_CONFIG_HOME", xdgConfig)
 
-	Main([]string{"pre-commit", "add", "01-first", "echo", "first"})
-	Main([]string{"pre-commit", "add", "10-second", "echo", "second"})
+	withNonRepoDir(t, func() {
+		Main([]string{"pre-commit", "add", "01-first", "echo", "first"})
+		Main([]string{"pre-commit", "add", "10-second", "echo", "second"})
 
-	err := Main([]string{"pre-commit", "top", "first"})
-	if err != nil {
-		t.Fatal(err)
-	}
+		err := Main([]string{"pre-commit", "top", "first"})
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
 }
 
 func TestPreCommitListStripsPrefix(t *testing.T) {
 	xdgConfig := filepath.Join(t.TempDir(), "config")
 	t.Setenv("XDG_CONFIG_HOME", xdgConfig)
 
-	Main([]string{"pre-commit", "add", "01-binary-check", "echo", "binary"})
-	Main([]string{"pre-commit", "add", "author-check", "echo", "author"})
+	withNonRepoDir(t, func() {
+		Main([]string{"pre-commit", "add", "01-binary-check", "echo", "binary"})
+		Main([]string{"pre-commit", "add", "author-check", "echo", "author"})
 
-	output := captureStdout(t, func() {
-		Main([]string{"pre-commit", "list"})
+		output := captureStdout(t, func() {
+			Main([]string{"pre-commit", "list"})
+		})
+
+		if !strings.Contains(output, "binary-check") {
+			t.Errorf("list should show display name, got:\n%s", output)
+		}
+		if strings.Contains(output, "01-binary-check") {
+			t.Errorf("list should NOT show numeric prefix, got:\n%s", output)
+		}
+		if !strings.Contains(output, "author-check") {
+			t.Errorf("list should show non-prefixed name, got:\n%s", output)
+		}
 	})
-
-	if !strings.Contains(output, "binary-check") {
-		t.Errorf("list should show display name, got:\n%s", output)
-	}
-	if strings.Contains(output, "01-binary-check") {
-		t.Errorf("list should NOT show numeric prefix, got:\n%s", output)
-	}
-	if !strings.Contains(output, "author-check") {
-		t.Errorf("list should show non-prefixed name, got:\n%s", output)
-	}
 }
