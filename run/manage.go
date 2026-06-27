@@ -40,7 +40,7 @@ func addPreCommitHook(config Config, args []string) error {
 	if err := os.WriteFile(path, []byte(content), 0755); err != nil {
 		return err
 	}
-	fmt.Printf("Added pre-commit hook: %s\n", name)
+	printAddedManagedHook("pre-commit", name, path, args[1:])
 	return nil
 }
 
@@ -94,7 +94,7 @@ func addPrePushHook(config Config, args []string) error {
 	if err := os.WriteFile(path, []byte(content), 0755); err != nil {
 		return err
 	}
-	fmt.Printf("Added pre-push hook: %s\n", name)
+	printAddedManagedHook("pre-push", name, path, args[1:])
 	return nil
 }
 
@@ -300,6 +300,11 @@ func validateHookName(name string) error {
 		return fmt.Errorf("hook name must not contain path separators: %s", name)
 	}
 	return nil
+}
+
+func printAddedManagedHook(phase, name, path string, cmdArgs []string) {
+	fmt.Printf("Added %s hook: %s at %s\n", phase, name, path)
+	fmt.Printf("  command: %s\n", displayShellCommand(shellJoin(cmdArgs)))
 }
 
 func shellJoin(args []string) string {
