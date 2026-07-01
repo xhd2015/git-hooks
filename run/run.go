@@ -232,7 +232,17 @@ func runPreCommitHooks(config Config, args []string) error {
 		env = append(env, "GIT_HOOK_AMEND=1")
 	}
 
-	return runManagedHooks(config, managedPreCommitDir(config), "pre-commit", env)
+	localDir := managedPreCommitDir(config)
+	globalDir, err := globalManagedHooksDir("pre-commit")
+	if err != nil {
+		return err
+	}
+	if localDir != globalDir {
+		if err := runManagedHooks(config, localDir, "pre-commit", env); err != nil {
+			return err
+		}
+	}
+	return runManagedHooks(config, globalDir, "pre-commit", env)
 }
 
 func runPrePushHooks(config Config, args []string) error {
@@ -243,7 +253,17 @@ func runPrePushHooks(config Config, args []string) error {
 		"GIT_HOOK_PHASE=push",
 	}
 
-	return runManagedHooks(config, managedPrePushDir(config), "pre-push", env)
+	localDir := managedPrePushDir(config)
+	globalDir, err := globalManagedHooksDir("pre-push")
+	if err != nil {
+		return err
+	}
+	if localDir != globalDir {
+		if err := runManagedHooks(config, localDir, "pre-push", env); err != nil {
+			return err
+		}
+	}
+	return runManagedHooks(config, globalDir, "pre-push", env)
 }
 
 func runManagedHooks(config Config, dir string, phase string, extraEnv []string) error {
@@ -312,6 +332,14 @@ func managedPreCommitDir(config Config) string {
 
 func managedPrePushDir(config Config) string {
 	return filepath.Join(config.ConfigRoot, "pre-push.d")
+}
+
+func globalManagedHooksDir(phase string) (string, error) {
+	root, err := userConfigRootDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(root, phase+".d"), nil
 }
 
 func configuredGlobalHooksPath() (string, bool, error) {

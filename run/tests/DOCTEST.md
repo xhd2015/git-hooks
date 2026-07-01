@@ -58,6 +58,9 @@ run/tests/
 │           ├── default-global-only
 │           ├── local-empty
 │           └── global-only
+│   ├── global-run/
+│   │   ├── global-hook-runs-on-commit
+│   │   └── global-hook-runs-on-other-repo
 └── pre-push/
     ├── add/
     │   ├── inside-repo/
@@ -277,7 +280,6 @@ func runIsolation(t *testing.T, req *Request) (*Response, error) {
 		return nil, err
 	}
 	if err := writeFile(req.RepoB, "file.txt", "repo-b\n"); err != nil {
-		return nil, err
 	}
 	if err := runGit(env, req.RepoA, "add", "file.txt"); err != nil {
 		return nil, err
@@ -349,12 +351,100 @@ func runAdd(t *testing.T, req *Request) (*Response, error) {
 	return resp, nil
 }
 
+func runGlobalHookOtherRepo(t *testing.T, req *Request) (*Response, error) {
+	env := isolatedEnv(req)
+
+	if err := runGit(env, req.RepoB, "config", "user.email", "b@test"); err != nil {
+		return nil, err
+	}
+	if err := runGit(env, req.RepoB, "config", "user.name", "B"); err != nil {
+		return nil, err
+	}
+
+	addCmd := fmt.Sprintf("echo GLOBAL_HOOK_RAN >> %q", req.MarkerPath)
+	hookArgs := []string{"pre-commit", "add", "--global", "global-test", "sh", "-c", addCmd}
+	if err := runCLI(env, req.RepoA, req.ToolPath, hookArgs...); err != nil {
+		return nil, fmt.Errorf("global hook add: %w", err)
+	}
+
+	if err := writeFile(req.RepoB, "file.txt", "repo-b\n"); err != nil {
+		return nil, err
+	}
+	if err := runGit(env, req.RepoB, "add", "file.txt"); err != nil {
+		return nil, err
+	}
+
+	output, exitCode, err := runGitCapture(env, req.RepoB, "commit", "-m", "test")
+	if err != nil && exitCode == 0 {
+		return nil, err
+	}
+
+	markerData, readErr := os.ReadFile(req.MarkerPath)
+	markerExists := readErr == nil
+	if readErr != nil && !os.IsNotExist(readErr) {
+		return nil, readErr
+	}
+
+	return &Response{
+		CommitOutput: string(output),
+		CommitExit:   exitCode,
+		MarkerExists: markerExists,
+		MarkerData:   string(markerData),
+	}, nil
+}
+
+func runGlobalHook(t *testing.T, req *Request) (*Response, error) {
+	env := isolatedEnv(req)
+
+	if err := runGit(env, req.RepoA, "config", "user.email", "a@test"); err != nil {
+		return nil, err
+	}
+	if err := runGit(env, req.RepoA, "config", "user.name", "A"); err != nil {
+		return nil, err
+	}
+
+	addCmd := fmt.Sprintf("echo GLOBAL_HOOK_RAN >> %q", req.MarkerPath)
+	hookArgs := []string{"pre-commit", "add", "--global", "global-test", "sh", "-c", addCmd}
+	if err := runCLI(env, req.RepoA, req.ToolPath, hookArgs...); err != nil {
+		return nil, fmt.Errorf("global hook add: %w", err)
+	}
+
+	if err := writeFile(req.RepoA, "file.txt", "repo-a\n"); err != nil {
+		return nil, err
+	}
+	if err := runGit(env, req.RepoA, "add", "file.txt"); err != nil {
+		return nil, err
+	}
+
+	output, exitCode, err := runGitCapture(env, req.RepoA, "commit", "-m", "test")
+	if err != nil && exitCode == 0 {
+		return nil, err
+	}
+
+	markerData, readErr := os.ReadFile(req.MarkerPath)
+	markerExists := readErr == nil
+	if readErr != nil && !os.IsNotExist(readErr) {
+		return nil, readErr
+	}
+
+	return &Response{
+		CommitOutput: string(output),
+		CommitExit:   exitCode,
+		MarkerExists: markerExists,
+		MarkerData:   string(markerData),
+	}, nil
+}
+
 func Run(t *testing.T, req *Request) (*Response, error) {
 	switch req.TestKind {
 	case "list":
 		return runList(t, req)
 	case "add":
 		return runAdd(t, req)
+	case "global-run-other":
+		return runGlobalHookOtherRepo(t, req)
+	case "global-run":
+		return runGlobalHook(t, req)
 	default:
 		return runIsolation(t, req)
 	}
