@@ -33,6 +33,8 @@ Commands:
   pre-commit list [--local] [--global] [--show-origin]  list managed pre-commit hooks
   pre-commit add [--global] <name> <cmd>  add a managed pre-commit hook (auto-installs dispatchers)
   pre-commit remove [--global] <name>  remove a managed pre-commit hook
+  pre-commit disable [--global] [<name>|--all]  disable managed pre-commit hook(s)
+  pre-commit enable [--global] [<name>|--all]   enable managed pre-commit hook(s)
   pre-commit rename <old> <new>    rename a managed pre-commit hook
   pre-commit up <name>             move hook earlier (swap with previous)
   pre-commit down <name>           move hook later (swap with next)
@@ -41,6 +43,8 @@ Commands:
   pre-push list [--local] [--global] [--show-origin]    list managed pre-push hooks
   pre-push add [--global] <name> <cmd>    add a managed pre-push hook (auto-installs dispatchers)
   pre-push remove [--global] <name>  remove a managed pre-push hook
+  pre-push disable [--global] [<name>|--all]    disable managed pre-push hook(s)
+  pre-push enable [--global] [<name>|--all]     enable managed pre-push hook(s)
   pre-push rename <old> <new>      rename a managed pre-push hook
   pre-push up <name>               move hook earlier (swap with previous)
   pre-push down <name>             move hook later (swap with next)
@@ -57,6 +61,8 @@ Usage: git-hooks pre-commit <command> [OPTIONS]
 Commands:
   list [--local] [--global] [--show-origin]  list managed pre-commit hooks
   add [--global] <name> <cmd>   add a managed pre-commit hook (auto-installs dispatchers)
+  disable [--global] [<name>|--all]  disable managed pre-commit hook(s)
+  enable [--global] [<name>|--all]   enable managed pre-commit hook(s)
   remove [--global] <name>      remove a managed pre-commit hook
   rename <old> <new>            rename a managed pre-commit hook
   up <name>                     move hook earlier (swap with previous)
@@ -71,6 +77,8 @@ Usage: git-hooks pre-push <command> [OPTIONS]
 Commands:
   list [--local] [--global] [--show-origin]  list managed pre-push hooks
   add [--global] <name> <cmd>   add a managed pre-push hook (auto-installs dispatchers)
+  disable [--global] [<name>|--all]  disable managed pre-push hook(s)
+  enable [--global] [<name>|--all]   enable managed pre-push hook(s)
   remove [--global] <name>      remove a managed pre-push hook
   rename <old> <new>            rename a managed pre-push hook
   up <name>                     move hook earlier (swap with previous)
@@ -154,6 +162,10 @@ func handlePreCommit(config Config, args []string) error {
 		return listPreCommitHooks(config, args[1:])
 	case "add":
 		return addPreCommitHook(config, args[1:])
+	case "disable":
+		return disablePreCommitHook(config, args[1:])
+	case "enable":
+		return enablePreCommitHook(config, args[1:])
 	case "remove":
 		return removePreCommitHook(config, args[1:])
 	case "rename":
@@ -190,6 +202,10 @@ func handlePrePush(config Config, args []string) error {
 		return listPrePushHooks(config, args[1:])
 	case "add":
 		return addPrePushHook(config, args[1:])
+	case "disable":
+		return disablePrePushHook(config, args[1:])
+	case "enable":
+		return enablePrePushHook(config, args[1:])
 	case "remove":
 		return removePrePushHook(config, args[1:])
 	case "rename":

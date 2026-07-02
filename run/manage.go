@@ -73,6 +73,14 @@ func removePreCommitHook(config Config, args []string) error {
 	return nil
 }
 
+func disablePreCommitHook(config Config, args []string) error {
+	return toggleHookEnabled(config, "pre-commit", false, args)
+}
+
+func enablePreCommitHook(config Config, args []string) error {
+	return toggleHookEnabled(config, "pre-commit", true, args)
+}
+
 func addPrePushHook(config Config, args []string) error {
 	var global bool
 	var err error
@@ -149,6 +157,97 @@ func removeManagedDir(config Config, phase string, global bool) (string, error) 
 	default:
 		return "", fmt.Errorf("unknown phase: %s", phase)
 	}
+}
+
+func disablePrePushHook(config Config, args []string) error {
+	return toggleHookEnabled(config, "pre-push", false, args)
+}
+
+func enablePrePushHook(config Config, args []string) error {
+	return toggleHookEnabled(config, "pre-push", true, args)
+}
+
+func toggleHookEnabled(config Config, phase string, enable bool, args []string) error {
+	var global bool
+	var all bool
+	var err error
+	action := "disable"
+	actionPast := "Disabled"
+	if enable {
+		action = "enable"
+		actionPast = "Enabled"
+	}
+	usage := fmt.Sprintf("usage: git-hooks %s %s [<name>|--all]", phase, action)
+	args, err = flags.
+		Bool("--global", &global).
+		Bool("--all", &all).
+		Parse(args)
+	if err != nil {
+		return err
+	}
+	if all == (len(args) == 1) || len(args) > 1 {
+		return fmt.Errorf("%s", usage)
+	}
+
+	dir, err := managedHookDirForScope(config, phase, global)
+	if err != nil {
+		return err
+	}
+	if all {
+		hooks, err := listManagedHooks(dir)
+		if err != nil {
+			return err
+		}
+		for _, hook := range hooks {
+			if err := setHookExecutable(filepath.Join(dir, hook), enable); err != nil {
+				return err
+			}
+		}
+		fmt.Printf("%s %d %s hooks\n", actionPast, len(hooks), phase)
+		return nil
+	}
+
+	file, err := resolveHookName(dir, args[0])
+	if err != nil {
+		return err
+	}
+	if err := setHookExecutable(filepath.Join(dir, file), enable); err != nil {
+		return err
+	}
+	fmt.Printf("%s %s hook: %s\n", actionPast, phase, displayHookName(file))
+	return nil
+}
+
+func managedHookDirForScope(config Config, phase string, global bool) (string, error) {
+	if global {
+		return globalManagedHooksDir(phase)
+	}
+	dir, err := localManagedDir(phase)
+	if err != nil {
+		return "", fmt.Errorf("not inside a git repo: %w", err)
+	}
+	return dir, nil
+}
+
+func setHookExecutable(path string, enable bool) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	mode := info.Mode().Perm()
+	if !enable {
+		return os.Chmod(path, mode&^0111)
+	}
+	if mode&0400 != 0 {
+		mode |= 0100
+	}
+	if mode&0040 != 0 {
+		mode |= 0010
+	}
+	if mode&0004 != 0 {
+		mode |= 0001
+	}
+	return os.Chmod(path, mode)
 }
 
 func renamePreCommitHook(config Config, args []string) error {
