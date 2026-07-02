@@ -45,14 +45,24 @@ func addPreCommitHook(config Config, args []string) error {
 }
 
 func removePreCommitHook(config Config, args []string) error {
+	var global bool
+	var err error
+	args, err = flags.Bool("--global", &global).StopOnFirstArg().Parse(args)
+	if err != nil {
+		return err
+	}
 	if len(args) != 1 {
-		return fmt.Errorf("usage: git-hooks pre-commit remove <name>")
+		return fmt.Errorf("usage: git-hooks pre-commit remove [--global] <name>")
 	}
 	name := args[0]
 	if err := validateHookName(name); err != nil {
 		return err
 	}
-	path := filepath.Join(managedPreCommitDir(config), name)
+	dir, err := removeManagedDir(config, "pre-commit", global)
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(dir, name)
 	if err := os.Remove(path); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("pre-commit hook %s does not exist", name)
@@ -99,14 +109,24 @@ func addPrePushHook(config Config, args []string) error {
 }
 
 func removePrePushHook(config Config, args []string) error {
+	var global bool
+	var err error
+	args, err = flags.Bool("--global", &global).StopOnFirstArg().Parse(args)
+	if err != nil {
+		return err
+	}
 	if len(args) != 1 {
-		return fmt.Errorf("usage: git-hooks pre-push remove <name>")
+		return fmt.Errorf("usage: git-hooks pre-push remove [--global] <name>")
 	}
 	name := args[0]
 	if err := validateHookName(name); err != nil {
 		return err
 	}
-	path := filepath.Join(managedPrePushDir(config), name)
+	dir, err := removeManagedDir(config, "pre-push", global)
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(dir, name)
 	if err := os.Remove(path); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("pre-push hook %s does not exist", name)
@@ -115,6 +135,20 @@ func removePrePushHook(config Config, args []string) error {
 	}
 	fmt.Printf("Removed pre-push hook: %s\n", name)
 	return nil
+}
+
+func removeManagedDir(config Config, phase string, global bool) (string, error) {
+	if global {
+		return globalManagedHooksDir(phase)
+	}
+	switch phase {
+	case "pre-commit":
+		return managedPreCommitDir(config), nil
+	case "pre-push":
+		return managedPrePushDir(config), nil
+	default:
+		return "", fmt.Errorf("unknown phase: %s", phase)
+	}
 }
 
 func renamePreCommitHook(config Config, args []string) error {

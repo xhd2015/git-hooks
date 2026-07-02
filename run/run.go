@@ -32,7 +32,7 @@ Commands:
   install [--global] [--dry-run]   install git hook dispatcher
   pre-commit list [--local] [--global] [--show-origin]  list managed pre-commit hooks
   pre-commit add [--global] <name> <cmd>  add a managed pre-commit hook (auto-installs dispatchers)
-  pre-commit remove <name>         remove a managed pre-commit hook
+  pre-commit remove [--global] <name>  remove a managed pre-commit hook
   pre-commit rename <old> <new>    rename a managed pre-commit hook
   pre-commit up <name>             move hook earlier (swap with previous)
   pre-commit down <name>           move hook later (swap with next)
@@ -40,7 +40,7 @@ Commands:
   pre-commit run [--amend]         run managed pre-commit hooks
   pre-push list [--local] [--global] [--show-origin]    list managed pre-push hooks
   pre-push add [--global] <name> <cmd>    add a managed pre-push hook (auto-installs dispatchers)
-  pre-push remove <name>           remove a managed pre-push hook
+  pre-push remove [--global] <name>  remove a managed pre-push hook
   pre-push rename <old> <new>      rename a managed pre-push hook
   pre-push up <name>               move hook earlier (swap with previous)
   pre-push down <name>             move hook later (swap with next)
@@ -51,13 +51,13 @@ Options:
   -h,--help                        show help message
 `
 
-	const preCommitHelp = `
+const preCommitHelp = `
 Usage: git-hooks pre-commit <command> [OPTIONS]
 
 Commands:
   list [--local] [--global] [--show-origin]  list managed pre-commit hooks
   add [--global] <name> <cmd>   add a managed pre-commit hook (auto-installs dispatchers)
-  remove <name>                 remove a managed pre-commit hook
+  remove [--global] <name>      remove a managed pre-commit hook
   rename <old> <new>            rename a managed pre-commit hook
   up <name>                     move hook earlier (swap with previous)
   down <name>                   move hook later (swap with next)
@@ -65,13 +65,13 @@ Commands:
   run [--amend]                 run managed pre-commit hooks
 `
 
-	const prePushHelp = `
+const prePushHelp = `
 Usage: git-hooks pre-push <command> [OPTIONS]
 
 Commands:
   list [--local] [--global] [--show-origin]  list managed pre-push hooks
   add [--global] <name> <cmd>   add a managed pre-push hook (auto-installs dispatchers)
-  remove <name>                 remove a managed pre-push hook
+  remove [--global] <name>      remove a managed pre-push hook
   rename <old> <new>            rename a managed pre-push hook
   up <name>                     move hook earlier (swap with previous)
   down <name>                   move hook later (swap with next)
