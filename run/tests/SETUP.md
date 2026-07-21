@@ -8,7 +8,7 @@ isolated HOME -> two temp git repos -> install + pre-commit add -> git commit
 
 ## Preconditions
 
-- The `git-hooks` command module lives at the repository root (`filepath.Join(DOCTEST_ROOT, "..", "..")`).
+- The `git-hooks` command module lives at the repository root (`filepath.Join(d.DOCTEST_ROOT, "..", "..")`).
 - Every test runs with `HOME` set to a dedicated temporary directory (never the real user home).
 - `XDG_CONFIG_HOME` is set to `$HOME/.config` so managed hooks stay inside the fake home.
 - The built CLI is placed on `PATH` as `git-hooks` because installed hook scripts invoke that command name.
@@ -37,10 +37,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/xhd2015/doctest/session"
 )
 
-func Setup(t *testing.T, req *Request) error {
-	req.CommandDir = filepath.Clean(filepath.Join(DOCTEST_ROOT, "..", ".."))
+func Setup(t *testing.T, d *session.Doctest, req *Request) error {
+	req.CommandDir = filepath.Clean(filepath.Join(d.DOCTEST_ROOT, "..", ".."))
 	req.FakeHome = filepath.Join(t.TempDir(), "home")
 	req.BinDir = filepath.Join(t.TempDir(), "bin")
 	req.RepoA = filepath.Join(t.TempDir(), "repo-a")
